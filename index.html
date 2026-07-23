@@ -125,7 +125,7 @@ input[type=number]{width:90px}
 .palbtn.on{border-color:var(--grn);box-shadow:0 0 6px var(--grn2)}
 .palbtn .sw{width:14px;height:14px;border-radius:3px;border:1px solid rgba(255,255,255,.2)}
 .grid{display:grid;gap:2px;margin:8px 0;touch-action:none;max-width:560px}
-.cell{width:100%;aspect-ratio:1;border:1px solid #0c1c11;cursor:pointer}
+.cell{width:100%;aspect-ratio:1;border:1px solid #0c1c11;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:12px;color:rgba(0,0,0,.75);line-height:1;user-select:none}
 .rmline{display:flex;flex-wrap:wrap;gap:14px;margin-top:8px;font-size:11.5px}
 .rmline span{display:flex;align-items:center;gap:5px}
 .tl{border-left:2px solid var(--grn2);padding:6px 0 6px 14px;margin-left:6px}
@@ -279,7 +279,8 @@ function buildNav(){
     n.appendChild(b);
   });
 }
-function go(id){current=id;SEARCHQ="";buildNav();const n=$("#nav");if(n)n.classList.remove("open");window.scrollTo(0,0);render();}
+function go(id){current=id;SEARCHQ="";try{history.replaceState(null,"",location.pathname+location.search+"#p="+id);}catch(e){}buildNav();const n=$("#nav");if(n)n.classList.remove("open");window.scrollTo(0,0);render();}
+function pageLink(id){return location.origin+location.pathname+"#p="+id;}
 
 /* ---------- render dispatch ---------- */
 function render(){
@@ -297,7 +298,13 @@ function render(){
 }
 function head(m,h,sub){
   const w=el("div","crtwrap");
-  w.appendChild(el("div","pg-h",h));
+  const top=el("div");top.style.cssText="display:flex;justify-content:space-between;align-items:flex-start;gap:10px";
+  top.appendChild(el("div","pg-h",h));
+  const lk=el("button","btn");lk.textContent="🔗 link";lk.title="Copy a link straight to this page";
+  lk.style.cssText="padding:3px 9px;font-size:11px;flex:0 0 auto";
+  lk.onclick=()=>{const L=pageLink(current);if(navigator.clipboard)navigator.clipboard.writeText(L);window.prompt("Direct link to this page:",L);};
+  top.appendChild(lk);
+  w.appendChild(top);
   if(sub)w.appendChild(el("div","pg-sub",'<span class="prompt">root@navezgane:~$</span> '+sub));
   m.appendChild(w);return w;
 }
@@ -333,6 +340,18 @@ function pgDash(m){
    "Lucky Looter (General) for loot, and one combat perk matching your weapon &mdash; Dead Eye (rifle), Pummel Pete (club), "+
    "or Gunslinger (pistol). Save Mastery perks for late game (they need attribute 6+).</p>";
   m.appendChild(q);
+
+  const th=el("div","crtwrap");
+  th.innerHTML="<div class='grp-h'>TERMINAL THEME</div>";
+  const trow=el("div","palette");
+  Object.keys(THEMES).forEach(k=>{
+    const b=el("div","palbtn"+(currentTheme()===k?" on":""));
+    b.innerHTML=`<span class="sw" style="background:${THEMES[k].grn}"></span>${esc(THEMES[k].name)}`;
+    b.onclick=()=>{applyTheme(k);render();};
+    trow.appendChild(b);
+  });
+  th.appendChild(trow);
+  m.appendChild(th);
 
   const eco=el("div","crtwrap");
   const E=DB.perks.economy;
@@ -1200,15 +1219,33 @@ function decodeBuild(code){
 }
 function checkImport(){
   const h=location.hash||"";
-  if(h.indexOf("#b=")!==0)return;
-  const code=h.slice(3);
-  const nm=decodeBuild(code);
-  history.replaceState(null,"",location.pathname+location.search);
-  if(!nm)return;
-  if(confirm('Import shared build "'+nm.name+'" (Lv '+nm.level+') as a new survivor?')){
-    STATE.crew.push(nm);STATE.active=STATE.crew.length-1;save();
+  if(h.indexOf("#b=")===0){
+    const code=h.slice(3);const nm=decodeBuild(code);
+    history.replaceState(null,"",location.pathname+location.search);
+    if(nm&&confirm('Import shared build "'+nm.name+'" (Lv '+nm.level+') as a new survivor?')){
+      STATE.crew.push(nm);STATE.active=STATE.crew.length-1;save();
+    }
+    return;
+  }
+  if(h.indexOf("#p=")===0){
+    const id=h.slice(3);
+    if(PAGES.some(p=>p.id===id))current=id;
   }
 }
+/* ---------- THEME ---------- */
+const THEMES={
+  green:{grn:"#39ff87",grn2:"#1fae5a",cyan:"#4fd6ff",name:"Phosphor Green"},
+  amber:{grn:"#ffb638",grn2:"#c8850f",cyan:"#ffd27a",name:"Amber CRT"},
+  ice:{grn:"#5cd6ff",grn2:"#2b8fb8",cyan:"#8affd6",name:"Ice Blue"},
+  blood:{grn:"#ff5a5a",grn2:"#b02a2a",cyan:"#ff9a6a",name:"Blood Moon"}
+};
+function applyTheme(k){
+  const t=THEMES[k]||THEMES.green;
+  const r=document.documentElement.style;
+  r.setProperty("--grn",t.grn);r.setProperty("--grn2",t.grn2);r.setProperty("--cyan",t.cyan);
+  try{localStorage.setItem("stdtd7_theme",k);}catch(e){}
+}
+function currentTheme(){try{return localStorage.getItem("stdtd7_theme")||"green";}catch(e){return"green";}}
 function doShare(c){
   const link=shareLink(c);
   if(navigator.clipboard)navigator.clipboard.writeText(link);
@@ -1609,29 +1646,69 @@ function pgQuests(m){
     const ul=el("ul");ul.style.fontSize="12.5px";DB.locations.mechanics.forEach(x=>ul.appendChild(el("li",null,esc(x))));mw.appendChild(ul);m.appendChild(mw);}
 }
 
-/* ---------- BASE DESIGNER ---------- */
-const BD_LS="stdtd7_base_v1";
+/* ---------- BASE DESIGNER (v2) ---------- */
+const BD_LS="stdtd7_base_v2";
 const BD_PAL=[
-  {k:"",n:"Erase",c:"transparent"},
-  {k:"w",n:"Wall (concrete)",c:"#5a6a5e"},
-  {k:"d",n:"Door/Hatch",c:"#7a5a2a"},
-  {k:"f",n:"Walkway",c:"#2a3a2e"},
-  {k:"s",n:"Spikes",c:"#8a3a2a"},
-  {k:"b",n:"Blade Trap",c:"#c04030"},
-  {k:"t",n:"Turret",c:"#c0a030"},
-  {k:"e",n:"Elec Fence",c:"#4fd6ff"},
-  {k:"p",n:"Player spot",c:"#39ff87"},
-  {k:"g",n:"Generator",c:"#a060c0"}
+  {k:"",n:"Erase",c:"transparent",sym:""},
+  {k:"w",n:"Wall (concrete)",c:"#5a6a5e",sym:"█"},
+  {k:"W",n:"Wall (steel)",c:"#8a97a0",sym:"▓"},
+  {k:"f",n:"Walkway/floor",c:"#243026",sym:"·"},
+  {k:"r",n:"Ramp/stairs",c:"#3a5a44",sym:"◹"},
+  {k:"l",n:"Ladder/pole",c:"#5a7a8a",sym:"‖"},
+  {k:"d",n:"Door/Hatch",c:"#7a5a2a",sym:"◫"},
+  {k:"s",n:"Spikes",c:"#8a3a2a",sym:"▲"},
+  {k:"b",n:"Blade Trap",c:"#c04030",sym:"✳"},
+  {k:"a",n:"Dart Trap",c:"#d06a30",sym:"➤"},
+  {k:"t",n:"Turret",c:"#c0a030",sym:"⌖"},
+  {k:"e",n:"Elec Fence",c:"#4fd6ff",sym:"⌁"},
+  {k:"g",n:"Generator",c:"#a060c0",sym:"⚡"},
+  {k:"p",n:"Player spot",c:"#39ff87",sym:"★"},
+  {k:"c",n:"Loot/storage",c:"#c0c060",sym:"▤"},
+  {k:"k",n:"Workstation",c:"#6080c0",sym:"⚒"}
 ];
-let BD_SEL="w";
+const BD_DRAW={b:20,t:15,e:5,a:45,k:0}; // watts consumed per powered element (approx)
+const BD_GEN=300; // one generator bank (6 engines)
+let BD_SEL="w",BD_TOOL="paint",BD_DIM="16x12";
+function bdStore(){try{return JSON.parse(localStorage.getItem(BD_LS))||{};}catch(e){return{};}}
+function bdSaveAll(o){try{localStorage.setItem(BD_LS,JSON.stringify(o));}catch(e){}}
 function pgBaseDesign(m){
   head(m,"BASE DESIGNER","sketch --horde-base");
-  m.appendChild(el("div","note","Sketch a horde-base layout on the grid. Pick a block/trap, then click (or drag) cells. Saves to this device. This is a planning sketch, not to scale."));
-  let grid=(()=>{try{return JSON.parse(localStorage.getItem(BD_LS));}catch(e){return null;}})();
-  const COLS=16,ROWS=12;
-  if(!grid||grid.length!==ROWS*COLS)grid=new Array(ROWS*COLS).fill("");
-  const ctl=el("div","crtwrap");
-  ctl.innerHTML="<div class='grp-h'>PALETTE</div>";
+  const store=bdStore();
+  if(!store.layouts){store.layouts={"Layout 1":{dim:"16x12",cells:{}}};store.active="Layout 1";bdSaveAll(store);}
+  if(!store.layouts[store.active])store.active=Object.keys(store.layouts)[0];
+  let L=store.layouts[store.active];
+  BD_DIM=L.dim||"16x12";
+  const [COLS,ROWS]=BD_DIM.split("x").map(Number);
+  const colOf=k=>(BD_PAL.find(p=>p.k===k)||{}).c||"transparent";
+  const symOf=k=>(BD_PAL.find(p=>p.k===k)||{}).sym||"";
+
+  // layout manager
+  const lm=el("div","crtwrap");lm.innerHTML="<div class='grp-h'>LAYOUT</div>";
+  const lf=el("div","field");
+  const lsel=el("select");Object.keys(store.layouts).forEach(n=>{const o=el("option",null,n);if(n===store.active)o.selected=true;lsel.appendChild(o);});
+  lsel.onchange=()=>{store.active=lsel.value;bdSaveAll(store);go("basedesign");};
+  lf.appendChild(el("span","kbd","Current:"));lf.appendChild(lsel);
+  const nl=el("button","btn","+ New");nl.onclick=()=>{const nm=window.prompt("New layout name:","Layout "+(Object.keys(store.layouts).length+1));if(nm){store.layouts[nm]={dim:BD_DIM,cells:{}};store.active=nm;bdSaveAll(store);go("basedesign");}};
+  const rn=el("button","btn","✎ Rename");rn.onclick=()=>{const nm=window.prompt("Rename layout:",store.active);if(nm&&nm!==store.active){store.layouts[nm]=store.layouts[store.active];delete store.layouts[store.active];store.active=nm;bdSaveAll(store);go("basedesign");}};
+  const del=el("button","btn red","✕ Delete");del.onclick=()=>{if(Object.keys(store.layouts).length<=1){alert("Keep at least one layout.");return;}if(confirm("Delete "+store.active+"?")){delete store.layouts[store.active];store.active=Object.keys(store.layouts)[0];bdSaveAll(store);go("basedesign");}};
+  lf.appendChild(nl);lf.appendChild(rn);lf.appendChild(del);lm.appendChild(lf);
+  // grid size
+  const df=el("div","field");df.innerHTML="<label>Grid size</label>";
+  const dsel=el("select");["12x10","16x12","20x14","24x18","30x20"].forEach(d=>{const o=el("option",null,d);if(d===BD_DIM)o.selected=true;dsel.appendChild(o);});
+  dsel.onchange=()=>{L.dim=dsel.value;bdSaveAll(store);go("basedesign");};
+  df.appendChild(dsel);df.appendChild(el("span","kbd","cells (W×H)"));lm.appendChild(df);
+  m.appendChild(lm);
+
+  // tools + palette
+  const ctl=el("div","crtwrap");ctl.innerHTML="<div class='grp-h'>TOOLS</div>";
+  const trow=el("div","palette");
+  [["paint","✏ Paint"],["rect","▭ Rectangle"],["fill","🪣 Fill area"]].forEach(([k,n])=>{
+    const b=el("div","palbtn"+(BD_TOOL===k?" on":""));b.textContent=n;
+    b.onclick=()=>{BD_TOOL=k;trow.querySelectorAll(".palbtn").forEach(x=>x.classList.remove("on"));b.classList.add("on");rectStart=null;};
+    trow.appendChild(b);
+  });
+  ctl.appendChild(trow);
+  ctl.appendChild(el("div","grp-h","BLOCKS & TRAPS"));
   const pal=el("div","palette");
   BD_PAL.forEach(p=>{
     const b=el("div","palbtn"+(BD_SEL===p.k?" on":""));
@@ -1640,29 +1717,72 @@ function pgBaseDesign(m){
     pal.appendChild(b);
   });
   ctl.appendChild(pal);
-  const clr=el("button","btn red","⟲ Clear grid");
-  clr.onclick=()=>{grid=new Array(ROWS*COLS).fill("");localStorage.setItem(BD_LS,JSON.stringify(grid));go("basedesign");};
+  const clr=el("button","btn red","⟲ Clear this layout");
+  clr.onclick=()=>{if(confirm("Clear all cells in "+store.active+"?")){L.cells={};bdSaveAll(store);go("basedesign");}};
   ctl.appendChild(clr);
   m.appendChild(ctl);
+
+  // grid
   const w=el("div","crtwrap");
   const g=el("div","grid");g.style.gridTemplateColumns=`repeat(${COLS},1fr)`;
-  const colOf=k=>(BD_PAL.find(p=>p.k===k)||{}).c||"transparent";
-  let painting=false;
-  function paint(i,cell){grid[i]=BD_SEL;cell.style.background=colOf(BD_SEL);try{localStorage.setItem(BD_LS,JSON.stringify(grid));}catch(e){}}
+  g.style.maxWidth=Math.min(680,COLS*34)+"px";
+  let painting=false,rectStart=null;
+  function setCell(i,val){if(val)L.cells[i]=val;else delete L.cells[i];}
+  function drawCell(cell,i){const v=L.cells[i]||"";cell.style.background=colOf(v);cell.textContent=symOf(v);}
+  function commit(){bdSaveAll(store);updateTally();}
+  function paintOne(i,cell){setCell(i,BD_SEL);drawCell(cell,i);commit();}
+  function fillArea(i){const target=L.cells[i]||"";if(target===BD_SEL)return;const stack=[i],seen={};
+    while(stack.length){const c=stack.pop();if(seen[c])continue;seen[c]=1;if((L.cells[c]||"")!==target)continue;setCell(c,BD_SEL);
+      const x=c%COLS,y=(c/COLS)|0;[[x-1,y],[x+1,y],[x,y-1],[x,y+1]].forEach(([nx,ny])=>{if(nx>=0&&nx<COLS&&ny>=0&&ny<ROWS)stack.push(ny*COLS+nx);});}
+    redraw();commit();}
+  function rectFill(a,b){const ax=a%COLS,ay=(a/COLS)|0,bx=b%COLS,by=(b/COLS)|0;
+    for(let y=Math.min(ay,by);y<=Math.max(ay,by);y++)for(let x=Math.min(ax,bx);x<=Math.max(ax,bx);x++)setCell(y*COLS+x,BD_SEL);
+    redraw();commit();}
+  const cells=[];
+  function redraw(){cells.forEach((c,i)=>drawCell(c,i));}
   for(let i=0;i<ROWS*COLS;i++){
-    const cell=el("div","cell");cell.style.background=colOf(grid[i]);
-    cell.onmousedown=()=>{painting=true;paint(i,cell);};
-    cell.onmouseenter=()=>{if(painting)paint(i,cell);};
-    cell.onclick=()=>paint(i,cell);
+    const cell=el("div","cell");cells.push(cell);drawCell(cell,i);
+    cell.onmousedown=()=>{if(BD_TOOL==="paint"){painting=true;paintOne(i,cell);}};
+    cell.onmouseenter=()=>{if(painting&&BD_TOOL==="paint")paintOne(i,cell);};
+    cell.onclick=()=>{
+      if(BD_TOOL==="fill")fillArea(i);
+      else if(BD_TOOL==="rect"){if(rectStart==null){rectStart=i;cell.style.outline="2px solid var(--grn)";}else{rectFill(rectStart,i);rectStart=null;}}
+      else paintOne(i,cell);
+    };
     g.appendChild(cell);
   }
-  document.addEventListener("mouseup",()=>{painting=false;},{once:false});
+  document.addEventListener("mouseup",()=>{painting=false;});
+  // touch support
+  g.addEventListener("touchstart",e=>{if(BD_TOOL!=="paint")return;painting=true;tpaint(e);e.preventDefault();},{passive:false});
+  g.addEventListener("touchmove",e=>{if(painting)tpaint(e);e.preventDefault();},{passive:false});
+  g.addEventListener("touchend",()=>{painting=false;});
+  function tpaint(e){const t=e.touches[0];const elx=document.elementFromPoint(t.clientX,t.clientY);const i=cells.indexOf(elx);if(i>=0)paintOne(i,cells[i]);}
   w.appendChild(g);
   const leg=el("div","rmline");
-  BD_PAL.filter(p=>p.k).forEach(p=>{leg.appendChild(elHTML(`<span><span class="sw" style="display:inline-block;width:12px;height:12px;border-radius:2px;background:${p.c}"></span>${esc(p.n)}</span>`));});
+  BD_PAL.filter(p=>p.k).forEach(p=>{leg.appendChild(elHTML(`<span><span class="sw" style="display:inline-block;width:12px;height:12px;border-radius:2px;background:${p.c};text-align:center;font-size:10px">${p.sym}</span>${esc(p.n)}</span>`));});
   w.appendChild(leg);
   m.appendChild(w);
-  m.appendChild(el("div","note","Classic horde design: a 1-wide walkway (Walkway) that forces zombies single-file past Blade Traps / Electric Fence, with your Player spot behind a Door/Hatch and a Generator powering it all."));
+
+  // live tally
+  const tally=el("div","crtwrap");tally.id="bdtally";m.appendChild(tally);
+  function updateTally(){
+    const counts={};Object.values(L.cells).forEach(v=>{counts[v]=(counts[v]||0)+1;});
+    let draw=0,gens=0;
+    Object.keys(counts).forEach(k=>{if(BD_DRAW[k])draw+=BD_DRAW[k]*counts[k];if(k==="g")gens+=counts[k];});
+    const cap=gens*BD_GEN;const over=draw>cap;
+    const rows=BD_PAL.filter(p=>p.k&&counts[p.k]).map(p=>[`<span class="sw" style="display:inline-block;width:12px;height:12px;border-radius:2px;background:${p.c};vertical-align:middle"></span> ${esc(p.n)}`,counts[p.k],BD_DRAW[p.k]?BD_DRAW[p.k]*counts[p.k]+"W":"—"]);
+    tally.innerHTML="<div class='grp-h'>ELEMENT TALLY & POWER</div>"+
+      `<div class="metricrow">
+        <div class="metric"><div class="k">POWER DRAW</div><div class="v" style="${over?'color:var(--red)':''}">${draw}W</div></div>
+        <div class="metric"><div class="k">GENERATOR CAP</div><div class="v">${cap}W</div></div>
+        <div class="metric"><div class="k">GENERATORS</div><div class="v">${gens}</div></div>
+      </div>`+
+      (rows.length?tbl(["Element","Count","Power"],rows):"<div class='note'>Empty — start painting.</div>")+
+      (over?`<div class="warnbox">Over budget by ${draw-cap}W — add ${Math.ceil((draw-cap)/BD_GEN)} more generator bank(s) or split circuits.</div>`:
+        gens?`<div class="note">Within power budget. One Generator Bank = ~300W (6 engines).</div>`:"");
+  }
+  updateTally();
+  m.appendChild(el("div","note","Classic horde design: a 1-wide Walkway funnels zombies single-file past Blade Traps / Electric Fence, Player spot behind a Door/Hatch, Generator powering it. Rectangle tool is great for laying walls & floors fast."));
 }
 
 /* ---------- boot sequence ---------- */
@@ -1687,7 +1807,7 @@ function runBoot(){
     txt+=BOOT[line]+"\n";b.innerHTML=txt+'<span class="cur">█</span>';line++;
     setTimeout(tick,line<8?150:400);
   }
-  function enter(){const done=()=>{b.classList.add("hidden");$("#app").classList.remove("hidden");checkImport();buildNav();render();};
+  function enter(){const done=()=>{b.classList.add("hidden");$("#app").classList.remove("hidden");applyTheme(currentTheme());checkImport();buildNav();render();};
     document.addEventListener("keydown",done,{once:true});
     b.addEventListener("click",done,{once:true});
     setTimeout(done,4000);}
