@@ -131,6 +131,28 @@ input[type=number]{width:90px}
 .tl{border-left:2px solid var(--grn2);padding:6px 0 6px 14px;margin-left:6px}
 .tl .day{color:var(--amber);font-size:13px}
 .tl .ph{color:var(--cyan);font-size:14px;margin-bottom:2px}
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin:6px 0}
+.tile{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:14px;cursor:pointer;transition:transform .12s,border-color .12s,box-shadow .12s}
+.tile:hover{border-color:var(--grn);transform:translateY(-2px);box-shadow:0 4px 14px rgba(30,120,60,.18)}
+.tile .ic{font-size:22px}
+.tile .tn{color:var(--grn);font-size:14px;margin:6px 0 2px}
+.tile .td{color:var(--mut);font-size:11px;line-height:1.4}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;vertical-align:middle}
+.rostercard{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:12px 14px}
+.rostercard.me{border-color:var(--grn2)}
+.statusrow{display:flex;gap:5px;flex-wrap:wrap;margin-top:8px}
+.statusrow .sbtn{font-size:11px;padding:3px 9px;border:1px solid var(--line);border-radius:12px;cursor:pointer;color:var(--dim);background:var(--bg)}
+.statusrow .sbtn.on{color:#001;font-weight:500}
+.sess{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--grn2);border-radius:0 4px 4px 0;padding:11px 13px;margin:8px 0}
+.sess .when{color:var(--grn);font-size:15px}
+.rsvpbtns{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+.rsvpbtns .rb{font-size:12px;padding:4px 12px;border:1px solid var(--line);border-radius:4px;cursor:pointer;color:var(--dim);background:var(--bg)}
+.rsvpbtns .rb.yes.on{background:var(--grn);color:#001;border-color:var(--grn)}
+.rsvpbtns .rb.maybe.on{background:var(--amber);color:#001;border-color:var(--amber)}
+.rsvpbtns .rb.no.on{background:var(--red);color:#fff;border-color:var(--red)}
+.tallybar{display:flex;gap:12px;font-size:12px;margin-top:6px;color:var(--mut)}
+.banner{background:linear-gradient(90deg,rgba(30,120,60,.14),transparent);border:1px solid var(--line);border-left:3px solid var(--grn);border-radius:0 6px 6px 0;padding:12px 16px;margin-bottom:14px}
+.banner .cn{color:var(--grn);font-size:20px;text-shadow:0 0 10px var(--grn2)}
 .tabbar{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:10px}
 .tabbar .t{background:var(--panel);border:1px solid var(--line);color:var(--dim);padding:5px 12px;font-size:12px;cursor:pointer;border-radius:3px}
 .tabbar .t.active{color:var(--grn);border-color:var(--grn)}
@@ -197,12 +219,17 @@ const esc=s=>String(s==null?"":s).replace(/[&<>]/g,m=>({"&":"&amp;","<":"&lt;","
 
 /* ---------- persistent state ---------- */
 const LS="stdtd7_v1";
-function blankMember(name){return{name:name||"Survivor",level:1,
+function blankMember(name){return{name:name||"Survivor",level:1,status:"offline",gamertag:"",
   attributes:{Perception:1,Strength:1,Fortitude:1,Agility:1,Intellect:1},
-  perks:{},general:{},supplies:{},books:{}};}
+  perks:{},general:{},supplies:{},books:{},roles:{}};}
 let STATE=load();
-function load(){try{const s=JSON.parse(localStorage.getItem(LS));if(s&&s.crew&&s.crew.length)return s;}catch(e){}
-  return{crew:[blankMember("Survivor 1")],active:0};}
+function load(){let s=null;try{s=JSON.parse(localStorage.getItem(LS));}catch(e){}
+  if(!s||!s.crew||!s.crew.length)s={crew:[blankMember("Survivor 1")],active:0};
+  if(s.crewName==null)s.crewName="My Crew";
+  if(!Array.isArray(s.schedule))s.schedule=[];
+  s.crew.forEach(c=>{if(c.status==null)c.status="offline";if(c.gamertag==null)c.gamertag="";if(!c.roles)c.roles={};});
+  return s;}
+const STATUS={online:{l:"Online",c:"var(--grn)"},ready:{l:"Ready to play",c:"var(--cyan)"},afk:{l:"AFK/Busy",c:"var(--amber)"},offline:{l:"Offline",c:"var(--mut)"}};
 function save(){try{localStorage.setItem(LS,JSON.stringify(STATE));}catch(e){}}
 function member(){return STATE.crew[STATE.active];}
 
@@ -222,6 +249,8 @@ function budget(m){return m.level;} // 1 skill point per level
 /* ---------- navigation ---------- */
 const PAGES=[
   {id:"dash",ic:"◈",label:"Command",sec:"CORE"},
+  {id:"crewhub",ic:"👥",label:"Crew Hub"},
+  {id:"schedule",ic:"🗓",label:"Play Schedule"},
   {id:"builder",ic:"✦",label:"Perk Builder"},
   {id:"tracker",ic:"▤",label:"Crew Tracker"},
   {id:"hordebase",ic:"🌙",label:"Blood Moon Planner"},
@@ -285,7 +314,7 @@ function pageLink(id){return location.origin+location.pathname+"#p="+id;}
 /* ---------- render dispatch ---------- */
 function render(){
   const m=$("#main");m.innerHTML="";
-  ({dash:pgDash,builder:pgBuilder,tracker:pgTracker,hordebase:pgHordebase,weapons:pgWeapons,tools:pgTools,
+  ({dash:pgDash,crewhub:pgCrewHub,schedule:pgSchedule,builder:pgBuilder,tracker:pgTracker,hordebase:pgHordebase,weapons:pgWeapons,tools:pgTools,
     armor:pgArmor,mods:pgMods,books:pgBooks,crafting:pgCrafting,cookbook:pgCookbook,food:pgFood,
     farming:pgFarming,resources:pgResources,mining:pgMining,zombies:pgZombies,locations:pgLocations,
     firearms:pgFirearms,ammunition:pgAmmo,buffs:pgBuffs,prefabs:pgPrefabs,items:pgItems,building:pgBuilding,
@@ -321,6 +350,38 @@ function pgDash(m){
     if(k==="POINTS FREE"&&rem<0)c.querySelector(".v").style.color="var(--red)";
     row.appendChild(c);});
   m.appendChild(row);
+
+  // crew snapshot
+  const online=STATE.crew.filter(c=>c.status==="online"||c.status==="ready").length;
+  const ns=nextSession();
+  const snap=el("div","crtwrap");
+  snap.innerHTML="<div class='grp-h'>CREW SNAPSHOT — "+esc(STATE.crewName)+"</div>";
+  const sm=el("div","metricrow");
+  sm.innerHTML=`<div class="metric"><div class="k">MEMBERS</div><div class="v">${STATE.crew.length}</div></div>`+
+    `<div class="metric"><div class="k">ONLINE / READY</div><div class="v">${online}</div></div>`+
+    `<div class="metric"><div class="k">NEXT SESSION</div><div class="v" style="font-size:15px">${ns?esc(fmtWhen(ns.s.when)):"none set"}</div></div>`;
+  snap.appendChild(sm);
+  const hubb=el("button","btn","👥 Open Crew Hub");hubb.onclick=()=>go("crewhub");
+  const schb=el("button","btn","🗓 Play Schedule");schb.style.marginLeft="8px";schb.onclick=()=>go("schedule");
+  snap.appendChild(hubb);snap.appendChild(schb);
+  m.appendChild(snap);
+
+  // quick launcher tiles
+  const launch=el("div","crtwrap");launch.innerHTML="<div class='grp-h'>QUICK ACCESS</div>";
+  const tiles=el("div","tiles");
+  [["builder","✦","Perk Builder","Plan builds with point budget"],
+   ["hordebase","🌙","Blood Moon","Prep for night 7"],
+   ["calc","🧮","Crafting Calc","Shopping-list totals"],
+   ["lootcalc","🎲","Loot Stage","Gamestage & gear tier"],
+   ["basedesign","▦","Base Designer","Sketch your horde base"],
+   ["cookbook","🍳","Cookbook","Recipes & ingredients"],
+   ["progression","🌲","Tier Trees","Gear upgrade paths"],
+   ["index","🔠","Item Index","Search everything"]].forEach(([id,ic,tn,td])=>{
+    const t=el("div","tile");t.innerHTML=`<div class="ic">${ic}</div><div class="tn">${tn}</div><div class="td">${td}</div>`;
+    t.onclick=()=>go(id);tiles.appendChild(t);
+  });
+  launch.appendChild(tiles);
+  m.appendChild(launch);
 
   const w=el("div","crtwrap");
   w.innerHTML="<div class='grp-h'>BRIEFING</div>"+
@@ -1227,6 +1288,13 @@ function checkImport(){
     }
     return;
   }
+  if(h.indexOf("#c=")===0){
+    const code=h.slice(3);history.replaceState(null,"",location.pathname+location.search);
+    if(confirm("Join / sync this crew? This merges the shared roster and play schedule into your terminal.")){
+      if(importCrew(code))current="crewhub";
+    }
+    return;
+  }
   if(h.indexOf("#p=")===0){
     const id=h.slice(3);
     if(PAGES.some(p=>p.id===id))current=id;
@@ -1250,6 +1318,36 @@ function doShare(c){
   const link=shareLink(c);
   if(navigator.clipboard)navigator.clipboard.writeText(link);
   window.prompt("Share link copied — paste it in your group chat:",link);
+}
+/* ---- crew invite (whole roster + schedule) ---- */
+function encodeCrew(){
+  const payload={cn:STATE.crewName,
+    c:STATE.crew.map(m=>({n:m.name,l:m.level,st:m.status,gt:m.gamertag,a:m.attributes,p:m.perks,g:m.general,r:m.roles})),
+    sc:STATE.schedule};
+  try{return btoa(unescape(encodeURIComponent(JSON.stringify(payload))));}catch(e){return"";}
+}
+function crewInviteLink(){return location.origin+location.pathname+"#c="+encodeCrew();}
+function importCrew(code){
+  let o;try{o=JSON.parse(decodeURIComponent(escape(atob(code))));}catch(e){return false;}
+  if(!o||!o.c)return false;
+  if(o.cn)STATE.crewName=o.cn;
+  const byName={};STATE.crew.forEach((m,i)=>byName[m.name.toLowerCase()]=i);
+  (o.c||[]).forEach(mm=>{
+    const nm=blankMember(mm.n);nm.level=mm.l||1;nm.status=mm.st||"offline";nm.gamertag=mm.gt||"";
+    nm.attributes=Object.assign(nm.attributes,mm.a||{});nm.perks=mm.p||{};nm.general=mm.g||{};nm.roles=mm.r||{};
+    normalize(nm);
+    const k=nm.name.toLowerCase();
+    if(byName[k]!=null)STATE.crew[byName[k]]=nm; else {STATE.crew.push(nm);byName[k]=STATE.crew.length-1;}
+  });
+  // merge schedule by id
+  const sc=STATE.schedule||[];const idmap={};sc.forEach((s,i)=>idmap[s.id]=i);
+  (o.sc||[]).forEach(s=>{if(idmap[s.id]!=null){const ex=sc[idmap[s.id]];ex.rsvp=Object.assign(ex.rsvp||{},s.rsvp||{});ex.when=s.when;ex.note=s.note;}else sc.push(s);});
+  STATE.schedule=sc;save();return true;
+}
+function doInvite(){
+  const link=crewInviteLink();
+  if(navigator.clipboard)navigator.clipboard.writeText(link);
+  window.prompt("Crew invite link copied — send it to your crew. Opening it imports the roster + play schedule:",link);
 }
 
 /* ---------- CRAFTING CALCULATOR ---------- */
@@ -1783,6 +1881,136 @@ function pgBaseDesign(m){
   }
   updateTally();
   m.appendChild(el("div","note","Classic horde design: a 1-wide Walkway funnels zombies single-file past Blade Traps / Electric Fence, Player spot behind a Door/Hatch, Generator powering it. Rectangle tool is great for laying walls & floors fast."));
+}
+
+/* ---------- CREW HUB ---------- */
+function nextSession(){
+  const now=Date.now();
+  return (STATE.schedule||[]).map(s=>({s,t:Date.parse(s.when)}))
+    .filter(x=>!isNaN(x.t)&&x.t>now-3600000).sort((a,b)=>a.t-b.t)[0];
+}
+function fmtWhen(w){const t=Date.parse(w);if(isNaN(t))return w;
+  const d=new Date(t);return d.toLocaleString([],{weekday:"short",month:"short",day:"numeric",hour:"numeric",minute:"2-digit"});}
+function pgCrewHub(m){
+  head(m,"CREW HUB","crew --roster --invite");
+  // crew name banner
+  const ban=el("div","banner");
+  const meIdx=STATE.active;
+  ban.innerHTML=`<div class="cn" id="crewname">${esc(STATE.crewName)}</div>`+
+    `<div class="note">${STATE.crew.length} member${STATE.crew.length>1?"s":""} · you are <b>${esc(member().name)}</b></div>`;
+  m.appendChild(ban);
+
+  // invite / collaboration
+  const inv=el("div","crtwrap");
+  inv.innerHTML="<div class='grp-h'>INVITE YOUR CREW</div>"+
+    "<p class='note'>Send an invite link — when a crewmate opens it, your roster and play schedule merge into their terminal. "+
+    "After they set their status or RSVP, they send their link back and you re-import to see updates. (No account, no server — links carry the data.)</p>";
+  const nf=el("div","field");nf.innerHTML="<label>Crew name</label>";
+  const ni=el("input");ni.value=STATE.crewName;ni.oninput=()=>{STATE.crewName=ni.value;save();const cn=$("#crewname");if(cn)cn.textContent=ni.value;};
+  nf.appendChild(ni);inv.appendChild(nf);
+  const invBtn=el("button","btn","🔗 Copy crew invite link");invBtn.onclick=doInvite;
+  const syncBtn=el("button","btn","⟳ Sync from a link");syncBtn.style.marginLeft="8px";
+  syncBtn.onclick=()=>{const L=window.prompt("Paste a crew invite link to merge it in:","");if(!L)return;const i=L.indexOf("#c=");if(i<0){alert("That doesn't look like a crew invite link.");return;}if(importCrew(L.slice(i+3)))go("crewhub");else alert("Couldn't read that link.");};
+  inv.appendChild(invBtn);inv.appendChild(syncBtn);
+  m.appendChild(inv);
+
+  // next session
+  const ns=nextSession();
+  const nsw=el("div","crtwrap");
+  nsw.innerHTML="<div class='grp-h'>NEXT SESSION</div>";
+  if(ns){const yes=Object.values(ns.s.rsvp||{}).filter(v=>v==="yes").length;
+    nsw.innerHTML+=`<div class="sess"><div class="when">${esc(fmtWhen(ns.s.when))}</div>`+
+      (ns.s.note?`<div class="note">${esc(ns.s.note)}</div>`:"")+
+      `<div class="tallybar"><span style="color:var(--grn)">✓ ${yes} in</span></div></div>`+
+      `<button class="btn" onclick="">Manage in Play Schedule →</button>`;
+    nsw.querySelector("button").onclick=()=>go("schedule");
+  }else{nsw.innerHTML+="<div class='note'>No upcoming sessions. </div>";
+    const b=el("button","btn","+ Schedule a session");b.onclick=()=>go("schedule");nsw.appendChild(b);}
+  m.appendChild(nsw);
+
+  // roster
+  const rw=el("div","crtwrap");rw.innerHTML="<div class='grp-h'>ROSTER</div>";
+  const grid=el("div","cardgrid");
+  STATE.crew.forEach((c,i)=>{
+    const card=el("div","rostercard"+(i===meIdx?" me":""));
+    const roles=c.roles?Object.keys(c.roles):[];
+    const st=STATUS[c.status]||STATUS.offline;
+    card.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+        <div><span class="dot" style="background:${st.c}"></span><b style="color:var(--grn)">${esc(c.name)}</b>${i===meIdx?' <span class="pill">you</span>':''}</div>
+        <span class="pill">Lv ${c.level}</span></div>`+
+      (c.gamertag?`<div class="note">PSN: ${esc(c.gamertag)}</div>`:"")+
+      `<div class="note">${esc(st.l)}${roles.length?" · "+esc(roles.join(", ")):""}</div>`;
+    // status controls only for the active (you) member
+    if(i===meIdx){
+      const sr=el("div","statusrow");
+      Object.keys(STATUS).forEach(k=>{
+        const b=el("span","sbtn"+(c.status===k?" on":""));b.textContent=STATUS[k].l;
+        if(c.status===k)b.style.background=STATUS[k].c;
+        b.onclick=()=>{c.status=k;save();go("crewhub");};
+        sr.appendChild(b);
+      });
+      card.appendChild(sr);
+      const gf=el("div","field");gf.style.marginTop="8px";gf.innerHTML="<label style='min-width:60px'>PSN ID</label>";
+      const gi=el("input");gi.value=c.gamertag||"";gi.placeholder="your gamertag";gi.oninput=()=>{c.gamertag=gi.value;save();};
+      gf.appendChild(gi);card.appendChild(gf);
+    }else{
+      const sw=el("button","btn");sw.textContent="Set as me";sw.style.marginTop="8px";sw.style.fontSize="11px";sw.style.padding="3px 9px";
+      sw.onclick=()=>{STATE.active=i;save();go("crewhub");};card.appendChild(sw);
+    }
+    grid.appendChild(card);
+  });
+  rw.appendChild(grid);
+  const addb=el("button","btn","+ Add member");addb.style.marginTop="10px";
+  addb.onclick=()=>{STATE.crew.push(blankMember("Survivor "+(STATE.crew.length+1)));save();go("crewhub");};
+  rw.appendChild(addb);
+  m.appendChild(rw);
+}
+
+/* ---------- PLAY SCHEDULE ---------- */
+function pgSchedule(m){
+  head(m,"PLAY SCHEDULE","schedule --sessions --rsvp");
+  m.appendChild(el("div","note","Propose play sessions and RSVP. Sessions travel in the crew invite link — after you RSVP, re-share your link so the organizer sees your pick. You're RSVPing as: "+esc(member().name)));
+  // add session
+  const add=el("div","crtwrap");add.innerHTML="<div class='grp-h'>PROPOSE A SESSION</div>";
+  const f1=el("div","field");f1.innerHTML="<label>Date & time</label>";
+  const dt=el("input");dt.type="datetime-local";f1.appendChild(dt);
+  const f2=el("div","field");f2.innerHTML="<label>Note</label>";
+  const nt=el("input");nt.placeholder="e.g. Blood Moon night 7 / horde base build";nt.style.minWidth="240px";f2.appendChild(nt);
+  const ab=el("button","btn","+ Add session");
+  ab.onclick=()=>{if(!dt.value){alert("Pick a date & time.");return;}
+    STATE.schedule.push({id:"s"+Date.now()+Math.floor(Math.random()*999),when:dt.value,note:nt.value,rsvp:{}});save();go("schedule");};
+  add.appendChild(f1);add.appendChild(f2);add.appendChild(ab);m.appendChild(add);
+
+  // sessions list
+  const list=(STATE.schedule||[]).slice().sort((a,b)=>(Date.parse(a.when)||0)-(Date.parse(b.when)||0));
+  const w=el("div","crtwrap");w.innerHTML="<div class='grp-h'>SESSIONS ("+list.length+")</div>";
+  if(!list.length)w.appendChild(el("div","note","No sessions yet. Propose one above, then share the crew invite link."));
+  const meName=member().name;
+  list.forEach(s=>{
+    const box=el("div","sess");
+    const yes=[],maybe=[],no=[];
+    Object.keys(s.rsvp||{}).forEach(n=>{const v=s.rsvp[n];(v==="yes"?yes:v==="maybe"?maybe:no).push(n);});
+    box.innerHTML=`<div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start">
+        <div><div class="when">${esc(fmtWhen(s.when))}</div>${s.note?`<div class="note">${esc(s.note)}</div>`:""}</div></div>`+
+      `<div class="tallybar"><span style="color:var(--grn)">✓ ${yes.length} in</span><span style="color:var(--amber)">? ${maybe.length} maybe</span><span style="color:var(--red)">✕ ${no.length} out</span></div>`+
+      (yes.length?`<div class="note">In: ${esc(yes.join(", "))}</div>`:"");
+    const rb=el("div","rsvpbtns");
+    [["yes","✓ I'm in"],["maybe","? Maybe"],["no","✕ Can't"]].forEach(([v,lab])=>{
+      const b=el("span","rb "+v+((s.rsvp&&s.rsvp[meName]===v)?" on":""));b.textContent=lab;
+      b.onclick=()=>{if(!s.rsvp)s.rsvp={};s.rsvp[meName]=v;save();go("schedule");};
+      rb.appendChild(b);
+    });
+    box.appendChild(rb);
+    const del=el("button","btn red","✕ Remove");del.style.cssText="margin-top:8px;font-size:11px;padding:3px 9px";
+    del.onclick=()=>{STATE.schedule=STATE.schedule.filter(x=>x.id!==s.id);save();go("schedule");};
+    box.appendChild(del);
+    w.appendChild(box);
+  });
+  m.appendChild(w);
+  const share=el("div","crtwrap");
+  share.innerHTML="<div class='grp-h'>SHARE UPDATES</div><p class='note'>After RSVPing, send your crew link so others see your availability.</p>";
+  const sb=el("button","btn","🔗 Copy crew link");sb.onclick=doInvite;share.appendChild(sb);
+  m.appendChild(share);
 }
 
 /* ---------- boot sequence ---------- */
