@@ -120,6 +120,17 @@ input[type=number]{width:90px}
 .covcell{font-size:11.5px;padding:4px 10px;border:1px solid var(--line);border-radius:4px}
 .covcell.gap{border-color:#5a1313;color:var(--red)}
 .covcell.ok{border-color:var(--grn2);color:var(--grn)}
+.palette{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}
+.palbtn{display:flex;align-items:center;gap:6px;font-size:12px;padding:5px 10px;border:1px solid var(--line);border-radius:4px;cursor:pointer;color:var(--txt);background:var(--panel)}
+.palbtn.on{border-color:var(--grn);box-shadow:0 0 6px var(--grn2)}
+.palbtn .sw{width:14px;height:14px;border-radius:3px;border:1px solid rgba(255,255,255,.2)}
+.grid{display:grid;gap:2px;margin:8px 0;touch-action:none;max-width:560px}
+.cell{width:100%;aspect-ratio:1;border:1px solid #0c1c11;cursor:pointer}
+.rmline{display:flex;flex-wrap:wrap;gap:14px;margin-top:8px;font-size:11.5px}
+.rmline span{display:flex;align-items:center;gap:5px}
+.tl{border-left:2px solid var(--grn2);padding:6px 0 6px 14px;margin-left:6px}
+.tl .day{color:var(--amber);font-size:13px}
+.tl .ph{color:var(--cyan);font-size:14px;margin-bottom:2px}
 .tabbar{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:10px}
 .tabbar .t{background:var(--panel);border:1px solid var(--line);color:var(--dim);padding:5px 12px;font-size:12px;cursor:pointer;border-radius:3px}
 .tabbar .t.active{color:var(--grn);border-color:var(--grn)}
@@ -217,6 +228,10 @@ const PAGES=[
   {id:"calc",ic:"🧮",label:"Crafting Calculator"},
   {id:"lootcalc",ic:"🎲",label:"Loot / Gamestage"},
   {id:"comparearmor",ic:"⚖",label:"Armor Compare"},
+  {id:"roadmap",ic:"🗓",label:"Survival Roadmap"},
+  {id:"quests",ic:"📋",label:"Quest & Trader Tracker"},
+  {id:"basedesign",ic:"▦",label:"Base Designer"},
+  {id:"index",ic:"🔠",label:"Master Item Index"},
   {id:"cheatsheet",ic:"🖨",label:"Printable Cheat Sheet"},
   {id:"weapons",ic:"⚔",label:"Weapons",sec:"COMBAT"},
   {id:"progression",ic:"🌲",label:"Tier Progression"},
@@ -274,7 +289,8 @@ function render(){
     farming:pgFarming,resources:pgResources,mining:pgMining,zombies:pgZombies,locations:pgLocations,
     firearms:pgFirearms,ammunition:pgAmmo,buffs:pgBuffs,prefabs:pgPrefabs,items:pgItems,building:pgBuilding,
     progression:pgProgression,calc:pgCalc,lootcalc:pgLootCalc,comparearmor:pgCompareArmor,
-    cheatsheet:pgCheatSheet,electricity:pgElectricity,vehicles:pgVehicles}[current]||pgDash)(m);
+    cheatsheet:pgCheatSheet,electricity:pgElectricity,vehicles:pgVehicles,
+    roadmap:pgRoadmap,quests:pgQuests,basedesign:pgBaseDesign,index:pgIndex}[current]||pgDash)(m);
   m.appendChild(el("div","foot",
     "SURVIVOR TERMINAL · data compiled from the official 7 Days to Die wiki for the Update 2.0 perk system (current in V3.0.1). "+
     "Progress saves to this device automatically. Some V3.0 stat tweaks may not yet be documented."));
@@ -1505,6 +1521,148 @@ function pgCheatSheet(m){
     "<div class='grp-h'>your roles</div><p style='font-size:12.5px'>"+(roleList.length?esc(roleList.join(" · ")):"None assigned.")+"</p>"+
     "<div class='grp-h'>crew roster</div><p style='font-size:12.5px'>"+esc(STATE.crew.map(x=>x.name+" (Lv"+x.level+(x.roles&&Object.keys(x.roles).length?", "+Object.keys(x.roles).join("/"):"")+")").join("  |  "))+"</p>";
   m.appendChild(sheet);
+}
+
+/* ---------- MASTER ITEM INDEX ---------- */
+function pgIndex(m){
+  head(m,"MASTER ITEM INDEX","index --all --filter");
+  const idx=buildSearchIndex().slice().sort((a,b)=>a.name.localeCompare(b.name));
+  const ctl=el("div","crtwrap");
+  ctl.innerHTML="<div class='grp-h'>EVERY ENTRY ("+idx.length+")</div><p class='note'>Every named thing in the terminal in one A–Z list. Filter by text or page, click to jump.</p>";
+  const f=el("div","field");
+  const inp=el("input");inp.placeholder="filter…";inp.className="searchbox";
+  const psel=el("select");const anyo=el("option",null,"All pages");anyo.value="";psel.appendChild(anyo);
+  const pagesUsed=[...new Set(idx.map(e=>e.page))].sort();
+  pagesUsed.forEach(p=>{const o=el("option",null,PAGELABEL[p]||p);o.value=p;psel.appendChild(o);});
+  f.appendChild(inp);f.appendChild(psel);ctl.appendChild(f);m.appendChild(ctl);
+  const w=el("div","crtwrap");const host=el("div","srlist");w.appendChild(host);m.appendChild(w);
+  function draw(){
+    const q=inp.value.toLowerCase(),pg=psel.value;
+    const hits=idx.filter(e=>(!pg||e.page===pg)&&(!q||e.name.toLowerCase().includes(q)||e.sub.toLowerCase().includes(q))).slice(0,400);
+    host.innerHTML="";
+    if(!hits.length){host.appendChild(el("div","note","No matches."));return;}
+    hits.forEach(h=>{const r=el("div","srhit");
+      r.innerHTML=`<div><div class="nm">${esc(h.name)}</div><div class="sub">${esc(h.sub)}</div></div><div class="pg">${esc(PAGELABEL[h.page]||h.page)} ▶</div>`;
+      r.onclick=()=>go(h.page);host.appendChild(r);});
+    if(idx.filter(e=>(!pg||e.page===pg)&&(!q||e.name.toLowerCase().includes(q))).length>400)host.appendChild(el("div","note","(showing first 400 — filter to narrow)"));
+  }
+  inp.oninput=draw;psel.onchange=draw;draw();
+}
+
+/* ---------- SURVIVAL ROADMAP ---------- */
+const ROADMAP=[
+  {day:"Day 1",ph:"Land & tool up",task:"Punch trees/stone for a Stone Axe, Wood Club, and Bow + arrows. Grab plant fibers for a bedroll. Find a starter POI to hole up in tonight — do NOT get caught out after dark.",perk:"Pack Mule 1"},
+  {day:"Day 2-3",ph:"Water, food, first quests",task:"Craft a Bedroll + Land Claim Block. Boil/purify water (dew collector or campfire), cook meat. Visit the trader, take the free starter quests for early gear and skill points.",perk:"Your combat perk R1 + Miner 69'er 1"},
+  {day:"Day 4-6",ph:"Gear + Blood Moon prep",task:"Clear Tier-1/2 POIs for loot & magazines. Build/upgrade a small horde spot to cobblestone. Craft ammo, stock First Aid + splints. Repair your best weapon to full.",perk:"Lucky Looter 1-2, Healing Factor 1"},
+  {day:"Day 7",ph:"First Blood Moon",task:"Fight from your prepped spot. Funnel zombies single-file, keep a melee for demolishers (rare this early). Don't overextend — survive the night, then loot the corpses.",perk:"—"},
+  {day:"Day 8-14",ph:"Economy & workstations",task:"Set up Forge, Workbench, Chemistry Station, Cement Mixer. Read every magazine you find. Start a farm (corn/potato/blueberry). Push trader tiers for better inventory.",perk:"Advanced Engineering, Master Chef 1"},
+  {day:"Day 15-21",ph:"Tier up gear",task:"Aim for iron→steel weapons/tools and a matched armor set. Build a proper horde base (concrete + blade/dart traps + power). Craft or buy a vehicle for range.",perk:"Grease Monkey, armor perks"},
+  {day:"Day 22-28",ph:"Steel & specialization",task:"Steel tools, Q5+ weapons, full mods. Farm Tier-4/5 POIs and buried supplies. Wire up turrets. By day 28 Blood Moon expect ferals/radiated — AP ammo and demolisher plan required.",perk:"Mastery perks (attribute 6+)"},
+  {day:"Day 28+",ph:"Endgame",task:"Wasteland runs for top loot stage, legendary parts from Tier-5 quests, gyrocopter, fully powered fortress. Respec with Grandpa's Fergit'n Elixir to min-max your final build.",perk:"Cap your main attribute to 10"}
+];
+function pgRoadmap(m){
+  head(m,"SURVIVAL ROADMAP","plan --day 1 --to 28+");
+  m.appendChild(el("div","note","A general progression plan — adjust to your difficulty and loot settings. Cross-reference the Perk Builder and Blood Moon Planner."));
+  const w=el("div","crtwrap");
+  ROADMAP.forEach(r=>{
+    const tl=el("div","tl");
+    tl.innerHTML=`<div class="day">${esc(r.day)}</div><div class="ph">${esc(r.ph)}</div>`+
+      `<div style="font-size:12.5px">${esc(r.task)}</div>`+
+      (r.perk&&r.perk!=="—"?`<div style="margin-top:4px"><span class="tag att">Perks: ${esc(r.perk)}</span></div>`:"");
+    w.appendChild(tl);
+  });
+  m.appendChild(w);
+}
+
+/* ---------- QUEST & TRADER TRACKER ---------- */
+const TRADERS=["Trader Rekt","Trader Jen","Trader Bob","Trader Hugh","Trader Joel"];
+const QTIERS=["Tier 1","Tier 2","Tier 3","Tier 4","Tier 5","Tier 6"];
+function pgQuests(m){
+  head(m,"QUEST & TRADER TRACKER","track --traders --tiers");
+  const c=member();if(!c.quests)c.quests={};
+  const ctl=el("div","crtwrap");
+  ctl.innerHTML="<div class='grp-h'>ACTIVE SURVIVOR: "+esc(c.name)+"</div>"+
+    "<p class='note'>Track each trader's completed quest tier and count. Trader tiers unlock better inventory & the next tier of quests. Quest rewards do NOT grant skill points.</p>";
+  m.appendChild(ctl);
+  // quest types reference
+  if(DB.locations.questTypes){const qw=el("div","crtwrap");qw.innerHTML="<div class='grp-h'>QUEST TYPES</div>";
+    qw.appendChild(elHTML(tbl(["Type","Notes"],DB.locations.questTypes.map(q=>[`<b>${esc(q.type)}</b>`,esc(q.notes||"")]))));m.appendChild(qw);}
+  // tracker per trader
+  const w=el("div","crtwrap");w.innerHTML="<div class='grp-h'>YOUR TRADER PROGRESS</div>";
+  TRADERS.forEach(t=>{
+    const q=c.quests[t]||(c.quests[t]={tier:0,done:0});
+    const box=el("div");box.style.cssText="border:1px solid var(--line);border-radius:4px;padding:9px 11px;margin:6px 0";
+    const hdr=el("div");hdr.style.cssText="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px";
+    hdr.innerHTML=`<b style="color:var(--grn)">${esc(t)}</b>`;
+    const tsel=el("select");QTIERS.forEach((qt,i)=>{const o=el("option",null,qt);o.value=i+1;if(q.tier===i+1)o.selected=true;tsel.appendChild(o);});
+    const t0=el("option",null,"— not unlocked —");t0.value=0;if(!q.tier)t0.selected=true;tsel.insertBefore(t0,tsel.firstChild);
+    tsel.onchange=()=>{q.tier=+tsel.value;save();};
+    const lab=el("span","kbd","Current tier:");
+    const cnt=el("input");cnt.type="number";cnt.min=0;cnt.value=q.done;cnt.style.width="70px";
+    cnt.oninput=()=>{q.done=+cnt.value||0;save();};
+    hdr.appendChild(lab);hdr.appendChild(tsel);
+    const cw=el("span","kbd");cw.textContent="Quests done:";hdr.appendChild(cw);hdr.appendChild(cnt);
+    box.appendChild(hdr);w.appendChild(box);
+  });
+  m.appendChild(w);
+  if(DB.locations.mechanics){const mw=el("div","crtwrap");mw.innerHTML="<div class='grp-h'>TRADER / QUEST MECHANICS</div>";
+    const ul=el("ul");ul.style.fontSize="12.5px";DB.locations.mechanics.forEach(x=>ul.appendChild(el("li",null,esc(x))));mw.appendChild(ul);m.appendChild(mw);}
+}
+
+/* ---------- BASE DESIGNER ---------- */
+const BD_LS="stdtd7_base_v1";
+const BD_PAL=[
+  {k:"",n:"Erase",c:"transparent"},
+  {k:"w",n:"Wall (concrete)",c:"#5a6a5e"},
+  {k:"d",n:"Door/Hatch",c:"#7a5a2a"},
+  {k:"f",n:"Walkway",c:"#2a3a2e"},
+  {k:"s",n:"Spikes",c:"#8a3a2a"},
+  {k:"b",n:"Blade Trap",c:"#c04030"},
+  {k:"t",n:"Turret",c:"#c0a030"},
+  {k:"e",n:"Elec Fence",c:"#4fd6ff"},
+  {k:"p",n:"Player spot",c:"#39ff87"},
+  {k:"g",n:"Generator",c:"#a060c0"}
+];
+let BD_SEL="w";
+function pgBaseDesign(m){
+  head(m,"BASE DESIGNER","sketch --horde-base");
+  m.appendChild(el("div","note","Sketch a horde-base layout on the grid. Pick a block/trap, then click (or drag) cells. Saves to this device. This is a planning sketch, not to scale."));
+  let grid=(()=>{try{return JSON.parse(localStorage.getItem(BD_LS));}catch(e){return null;}})();
+  const COLS=16,ROWS=12;
+  if(!grid||grid.length!==ROWS*COLS)grid=new Array(ROWS*COLS).fill("");
+  const ctl=el("div","crtwrap");
+  ctl.innerHTML="<div class='grp-h'>PALETTE</div>";
+  const pal=el("div","palette");
+  BD_PAL.forEach(p=>{
+    const b=el("div","palbtn"+(BD_SEL===p.k?" on":""));
+    b.innerHTML=`<span class="sw" style="background:${p.c==="transparent"?"repeating-linear-gradient(45deg,#222,#222 3px,#333 3px,#333 6px)":p.c}"></span>${esc(p.n)}`;
+    b.onclick=()=>{BD_SEL=p.k;pal.querySelectorAll(".palbtn").forEach(x=>x.classList.remove("on"));b.classList.add("on");};
+    pal.appendChild(b);
+  });
+  ctl.appendChild(pal);
+  const clr=el("button","btn red","⟲ Clear grid");
+  clr.onclick=()=>{grid=new Array(ROWS*COLS).fill("");localStorage.setItem(BD_LS,JSON.stringify(grid));go("basedesign");};
+  ctl.appendChild(clr);
+  m.appendChild(ctl);
+  const w=el("div","crtwrap");
+  const g=el("div","grid");g.style.gridTemplateColumns=`repeat(${COLS},1fr)`;
+  const colOf=k=>(BD_PAL.find(p=>p.k===k)||{}).c||"transparent";
+  let painting=false;
+  function paint(i,cell){grid[i]=BD_SEL;cell.style.background=colOf(BD_SEL);try{localStorage.setItem(BD_LS,JSON.stringify(grid));}catch(e){}}
+  for(let i=0;i<ROWS*COLS;i++){
+    const cell=el("div","cell");cell.style.background=colOf(grid[i]);
+    cell.onmousedown=()=>{painting=true;paint(i,cell);};
+    cell.onmouseenter=()=>{if(painting)paint(i,cell);};
+    cell.onclick=()=>paint(i,cell);
+    g.appendChild(cell);
+  }
+  document.addEventListener("mouseup",()=>{painting=false;},{once:false});
+  w.appendChild(g);
+  const leg=el("div","rmline");
+  BD_PAL.filter(p=>p.k).forEach(p=>{leg.appendChild(elHTML(`<span><span class="sw" style="display:inline-block;width:12px;height:12px;border-radius:2px;background:${p.c}"></span>${esc(p.n)}</span>`));});
+  w.appendChild(leg);
+  m.appendChild(w);
+  m.appendChild(el("div","note","Classic horde design: a 1-wide walkway (Walkway) that forces zombies single-file past Blade Traps / Electric Fence, with your Player spot behind a Door/Hatch and a Generator powering it all."));
 }
 
 /* ---------- boot sequence ---------- */
