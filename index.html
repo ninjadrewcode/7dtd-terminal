@@ -114,6 +114,12 @@ input[type=number]{width:90px}
 .chk input{width:16px;height:16px;accent-color:var(--grn)}
 .chk.done span{color:var(--mut);text-decoration:line-through}
 .pill{font-size:10.5px;padding:1px 8px;border-radius:10px;border:1px solid var(--line);color:var(--mut)}
+.rolechip{display:inline-block;font-size:11.5px;padding:3px 10px;margin:3px 4px 3px 0;border:1px solid var(--line);border-radius:12px;color:var(--dim);background:var(--bg);cursor:pointer;user-select:none}
+.rolechip.on{color:#001;background:var(--grn);border-color:var(--grn);font-weight:500}
+.covrow{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0}
+.covcell{font-size:11.5px;padding:4px 10px;border:1px solid var(--line);border-radius:4px}
+.covcell.gap{border-color:#5a1313;color:var(--red)}
+.covcell.ok{border-color:var(--grn2);color:var(--grn)}
 .tabbar{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:10px}
 .tabbar .t{background:var(--panel);border:1px solid var(--line);color:var(--dim);padding:5px 12px;font-size:12px;cursor:pointer;border-radius:3px}
 .tabbar .t.active{color:var(--grn);border-color:var(--grn)}
@@ -196,6 +202,7 @@ const PAGES=[
   {id:"tracker",ic:"▤",label:"Crew Tracker"},
   {id:"hordebase",ic:"🌙",label:"Blood Moon Planner"},
   {id:"calc",ic:"🧮",label:"Crafting Calculator"},
+  {id:"lootcalc",ic:"🎲",label:"Loot / Gamestage"},
   {id:"weapons",ic:"⚔",label:"Weapons",sec:"COMBAT"},
   {id:"progression",ic:"🌲",label:"Tier Progression"},
   {id:"firearms",ic:"🔫",label:"Firearms Detail"},
@@ -249,7 +256,7 @@ function render(){
     armor:pgArmor,mods:pgMods,books:pgBooks,crafting:pgCrafting,cookbook:pgCookbook,food:pgFood,
     farming:pgFarming,resources:pgResources,mining:pgMining,zombies:pgZombies,locations:pgLocations,
     firearms:pgFirearms,ammunition:pgAmmo,buffs:pgBuffs,prefabs:pgPrefabs,items:pgItems,building:pgBuilding,
-    progression:pgProgression,calc:pgCalc}[current]||pgDash)(m);
+    progression:pgProgression,calc:pgCalc,lootcalc:pgLootCalc}[current]||pgDash)(m);
   m.appendChild(el("div","foot",
     "SURVIVOR TERMINAL · data compiled from the official 7 Days to Die wiki for the Update 2.0 perk system (current in V3.0.1). "+
     "Progress saves to this device automatically. Some V3.0 stat tweaks may not yet be documented."));
@@ -466,6 +473,20 @@ function pgTracker(m){
   ctl.appendChild(reset);
   m.appendChild(ctl);
 
+  // crew composition summary
+  const comp=el("div","crtwrap");
+  comp.innerHTML="<div class='grp-h'>CREW COMPOSITION</div>";
+  const cov=el("div","covrow");
+  ROLES.forEach(r=>{
+    const who=STATE.crew.filter(c=>c.roles&&c.roles[r]).map(c=>c.name);
+    const cell=el("div","covcell "+(who.length?"ok":"gap"));
+    cell.innerHTML=`<b>${esc(r)}</b>: ${who.length?esc(who.join(", ")):"— unassigned"}`;
+    cov.appendChild(cell);
+  });
+  comp.appendChild(cov);
+  comp.appendChild(el("div","note","Assign roles on each survivor below. Red = no one covering that job yet."));
+  m.appendChild(comp);
+
   STATE.crew.forEach((c,i)=>{
     const w=el("div","crtwrap");
     const b=budget(c),s=totalSpent(c),rem=b-s;
@@ -483,6 +504,16 @@ function pgTracker(m){
     lvf.appendChild(el("span","pill",`${rem<0?'⚠ ':''}${rem} pts free`));
     if(rem<0)lvf.querySelector(".pill").style.color="var(--red)";
     w.appendChild(lvf);
+    // role chips
+    if(!c.roles)c.roles={};
+    const rw=el("div");rw.style.margin="6px 0";
+    rw.appendChild(el("div","note","Crew roles:"));
+    ROLES.forEach(r=>{
+      const chip=el("span","rolechip"+(c.roles[r]?" on":""),esc(r));
+      chip.onclick=()=>{if(c.roles[r])delete c.roles[r];else c.roles[r]=true;save();render();};
+      rw.appendChild(chip);
+    });
+    w.appendChild(rw);
     // attribute summary
     const at=el("div","note");
     at.innerHTML="Attributes: "+DB.perks.attributes.map(A=>`${A.name.slice(0,3)} ${c.attributes[A.name]}`).join(" · ");
@@ -521,6 +552,7 @@ function pgTracker(m){
     m.appendChild(w);
   });
 }
+const ROLES=["Gunner","Melee/Tank","Miner","Builder","Medic","Scavenger","Farmer/Cook","Engineer","Scout/Driver"];
 const SUPPLIES=[
   {name:"TOOLS",items:["Stone Axe","Iron/Steel Fireaxe","Pickaxe","Auger","Chainsaw","Wrench/Ratchet/Impact Driver","Repair Kits x10"]},
   {name:"WEAPONS & AMMO",items:["Primary firearm (Q5+)","Melee sidearm","300+ rounds","Molotovs/Pipe Bombs","Robotic turret"]},
@@ -1117,7 +1149,7 @@ function runSearch(q){
 
 /* ---------- BUILD SHARING ---------- */
 function encodeBuild(c){
-  const payload={n:c.name,l:c.level,a:c.attributes,p:c.perks,g:c.general,s:c.supplies};
+  const payload={n:c.name,l:c.level,a:c.attributes,p:c.perks,g:c.general,s:c.supplies,r:c.roles};
   try{return btoa(unescape(encodeURIComponent(JSON.stringify(payload))));}catch(e){return"";}
 }
 function shareLink(c){
@@ -1128,7 +1160,7 @@ function decodeBuild(code){
   try{const o=JSON.parse(decodeURIComponent(escape(atob(code))));
     const nm=blankMember(o.n||"Imported");
     nm.level=o.l||1;nm.attributes=Object.assign(nm.attributes,o.a||{});
-    nm.perks=o.p||{};nm.general=o.g||{};nm.supplies=o.s||{};
+    nm.perks=o.p||{};nm.general=o.g||{};nm.supplies=o.s||{};nm.roles=o.r||{};
     normalize(nm);return nm;
   }catch(e){return null;}
 }
@@ -1151,6 +1183,37 @@ function doShare(c){
 
 /* ---------- CRAFTING CALCULATOR ---------- */
 const CALC_LS="stdtd7_cart_v1";
+// Approximate component recipes for breaking intermediates down to raw. Counts are rough (base).
+const INTER={
+  "Forged Iron":[["Iron",1]],
+  "Forged Steel":[["Forged Iron",1],["Coal",1]],
+  "Glue":[["Bone",1]],
+  "Duct Tape":[["Glue",1],["Cloth Fragment",2]],
+  "Gun Powder":[["Coal",1],["Nitrate Powder",1]],
+  "Gunpowder":[["Coal",1],["Nitrate Powder",1]],
+  "Cement":[["Stone",1]],
+  "Concrete Mix":[["Cement",1],["Sand",1],["Stone",1],["Water",1]],
+  "Bullet Tip":[["Lead",1]],
+  "Bullet Casing":[["Brass",1]],
+  "Casing":[["Brass",1]],
+  "Cloth":[["Cotton",1]],
+  "Short Iron Pipe":[["Forged Iron",1]],
+  "Nail":[["Forged Iron",1]],
+  "Repair Kit":[["Duct Tape",1],["Oil",1]],
+  "Beaker":[["Forged Iron",3]],
+  "Cooking Pot":[["Forged Iron",5]]
+};
+const RAW=new Set(["Wood","Stone","Iron","Coal","Nitrate Powder","Lead","Brass","Oil Shale","Clay Soil","Sand",
+  "Bone","Cloth Fragment","Cotton","Feather","Rotting Flesh","Water","Oil","Leather","Mechanical Parts",
+  "Electrical Parts","Spring","Paper","Plant Fibers","Acid","Scrap Polymers","Plastic","Raw Meat","Egg",
+  "Animal Fat","Honey","Testosterone Extract","Blueberries","Corn","Potato","Mushrooms","Yucca","Goldenrod",
+  "Super Corn","Snowberry","Chrysanthemum","Hops","Coffee Beans","Aloe","Pumpkin"]);
+function expandRaw(name,qty,depth,acc){
+  depth=depth||0;
+  if(depth>6||RAW.has(name)||!INTER[name]){acc[name]=(acc[name]||0)+qty;return acc;}
+  INTER[name].forEach(([sub,n])=>expandRaw(sub,n*qty,depth+1,acc));
+  return acc;
+}
 function calcRecipes(){
   const R=[];
   (DB.cookbook.recipes||[]).forEach(r=>{
@@ -1226,15 +1289,93 @@ function pgCalc(m){
     const it=elHTML(`<table class="shoplist"><tr><th>Crafting</th><th>Qty</th><th></th></tr>${itemRows.join("")}</table>`);
     sl.appendChild(el("div","note","Queued:"));sl.appendChild(it);
     it.querySelectorAll("[data-rm]").forEach(b=>b.onclick=()=>{cart.splice(+b.dataset.rm,1);cartSave(cart);go("calc");});
-    // grand totals
-    const rows=Object.keys(totals).sort().map(k=>[`<b>${esc(k)}</b>`,totals[k]]);
-    sl.appendChild(el("div","grp-h","TOTAL RAW MATERIALS NEEDED"));
+    // grand totals — optional recursive breakdown to raw
+    const breakdown=localStorage.getItem("stdtd7_calc_raw")==="1";
+    let finalTotals=totals;
+    if(breakdown){const acc={};Object.keys(totals).forEach(k=>expandRaw(k,totals[k],0,acc));finalTotals=acc;}
+    const rows=Object.keys(finalTotals).sort().map(k=>[
+      `<b>${esc(k)}</b>`+(breakdown&&!RAW.has(k)&&!INTER[k]?' <span class="tag warn">component</span>':''),
+      finalTotals[k]]);
+    const tog=el("label","chk"+(breakdown?" done":""));
+    const cb=el("input");cb.type="checkbox";cb.checked=breakdown;
+    cb.onchange=()=>{localStorage.setItem("stdtd7_calc_raw",cb.checked?"1":"0");go("calc");};
+    tog.appendChild(cb);tog.appendChild(el("span",null,"Break intermediates down to raw materials (ore, wood, etc.)"));
+    sl.appendChild(el("div","grp-h",breakdown?"TOTAL RAW MATERIALS (component tree expanded)":"TOTAL MATERIALS NEEDED"));
+    sl.appendChild(tog);
     sl.appendChild(elHTML(tbl(["Material","Qty"],rows)));
+    if(breakdown)sl.appendChild(el("div","note","Component-tree counts are approximate (base amounts before perks/forge discounts). Raw = mined/harvested/looted directly."));
     const clr=el("button","btn red","⟲ Clear list");
     clr.onclick=()=>{cartSave([]);go("calc");};
     sl.appendChild(clr);
   }
   m.appendChild(sl);
+}
+
+/* ---------- LOOT / GAMESTAGE CALCULATOR ---------- */
+const LOOT_LS="stdtd7_loot_v1";
+const BIOMES=[["Pine Forest",0.9],["Plains / Grassland",1.0],["Burnt Forest",1.1],["Snow",1.2],["Desert",1.3],["Wasteland",1.5]];
+const DIFF=[["Scavenger (1)",0.75],["Adventurer (2)",0.87],["Nomad (3, default)",1.0],["Warrior (4)",1.13],["Survivalist (5)",1.26],["Insane (6)",1.4]];
+function pgLootCalc(m){
+  head(m,"LOOT & GAMESTAGE","calc --gamestage --lootstage");
+  const cfg=Object.assign({level:member().level,day:7,players:1,diff:2,biome:1,ll:0,died:false,scav:false},
+    (()=>{try{return JSON.parse(localStorage.getItem(LOOT_LS))||{};}catch(e){return{};}})());
+  const w=el("div","crtwrap");
+  w.innerHTML="<div class='grp-h'>INPUTS</div><p class='note'>Gamestage drives horde size & zombie strength. Loot stage drives item quality. "+
+    "Formulas are the community-documented model — treat as a close approximation, not exact.</p>";
+  function numField(label,key,min,max,step){
+    const f=el("div","field");f.innerHTML=`<label>${label}</label>`;
+    const i=el("input");i.type="number";i.min=min;i.max=max||"";i.step=step||1;i.value=cfg[key];
+    i.oninput=()=>{cfg[key]=+i.value;persist();recalc();};f.appendChild(i);return f;}
+  function selField(label,key,opts){
+    const f=el("div","field");f.innerHTML=`<label>${label}</label>`;
+    const s=el("select");opts.forEach((o,i)=>{const op=el("option",null,o[0]);op.value=i;s.appendChild(op);});
+    s.value=cfg[key];s.onchange=()=>{cfg[key]=+s.value;persist();recalc();};f.appendChild(s);return f;}
+  const useMe=el("button","btn","↺ Use active survivor (Lv "+member().level+")");
+  useMe.onclick=()=>{cfg.level=member().level;const li=w.querySelector("input");if(li)li.value=cfg.level;persist();recalc();};
+  w.appendChild(numField("Player level","level",1,300));
+  w.appendChild(numField("Days survived","day",0,999));
+  w.appendChild(numField("Players (party)","players",1,8));
+  w.appendChild(selField("Difficulty","diff",DIFF));
+  w.appendChild(selField("Biome","biome",BIOMES));
+  w.appendChild(numField("Lucky Looter rank (0-5)","ll",0,5));
+  const cks=el("div","field");
+  const c1=el("label","chk");const cb1=el("input");cb1.type="checkbox";cb1.checked=cfg.died;cb1.onchange=()=>{cfg.died=cb1.checked;persist();recalc();};c1.appendChild(cb1);c1.appendChild(el("span",null,"Died recently (+loot buff)"));
+  const c2=el("label","chk");const cb2=el("input");cb2.type="checkbox";cb2.checked=cfg.scav;cb2.onchange=()=>{cfg.scav=cb2.checked;persist();recalc();};c2.appendChild(cb2);c2.appendChild(el("span",null,"Full Scavenger armor set (+loot)"));
+  cks.appendChild(c1);cks.appendChild(c2);w.appendChild(cks);
+  w.appendChild(useMe);
+  m.appendChild(w);
+  const out=el("div","crtwrap");out.id="lcout";m.appendChild(out);
+
+  function persist(){try{localStorage.setItem(LOOT_LS,JSON.stringify(cfg));}catch(e){}}
+  function recalc(){
+    const diffMult=DIFF[cfg.diff][1], biomeMult=BIOMES[cfg.biome][1];
+    const partyBonus=1+0.10*Math.max(0,Math.min(cfg.players,8)-1); // approx MP scaling
+    const gsSolo=Math.floor(cfg.level*0.4+cfg.day*0.5);
+    const gamestage=Math.floor(gsSolo*diffMult*partyBonus);
+    let llPct=0.05*Math.max(0,Math.min(cfg.ll,5));
+    if(cfg.scav)llPct+=0.10; // scavenger set approx
+    let lootBase=gamestage*(1+llPct);
+    if(cfg.died)lootBase+=lootBase*0.25; // died-recently buff approx (5-day)
+    const lootStage=Math.floor(lootBase*biomeMult);
+    const q=lootStage<20?"Q1–Q2 primitive":lootStage<60?"Q2–Q4 iron tier":lootStage<120?"Q4–Q5 steel tier":lootStage<200?"Q5–Q6, mods common":"Q6 / legendary parts";
+    out.innerHTML="<div class='grp-h'>RESULTS</div>"+
+      `<div class="metricrow">
+        <div class="metric"><div class="k">GAMESTAGE</div><div class="v">${gamestage}</div></div>
+        <div class="metric"><div class="k">LOOT STAGE</div><div class="v">${lootStage}</div></div>
+        <div class="metric"><div class="k">EXPECTED GEAR</div><div class="v" style="font-size:15px">${q}</div></div>
+      </div>`+
+      `<table><tr><th>Factor</th><th>Value</th></tr>`+
+      `<tr><td>Solo base (lvl×0.4 + day×0.5)</td><td>${gsSolo}</td></tr>`+
+      `<tr><td>Difficulty ×</td><td>${DIFF[cfg.diff][0]} → ×${diffMult}</td></tr>`+
+      `<tr><td>Party ×</td><td>${cfg.players} players → ×${partyBonus.toFixed(2)}</td></tr>`+
+      `<tr><td>Lucky Looter</td><td>rank ${cfg.ll} → +${(0.05*cfg.ll*100).toFixed(0)}% loot${cfg.scav?" (+10% Scavenger set)":""}</td></tr>`+
+      `<tr><td>Biome ×</td><td>${BIOMES[cfg.biome][0]} → ×${biomeMult}</td></tr>`+
+      `<tr><td>Died-recently buff</td><td>${cfg.died?"+25% loot (active)":"off"}</td></tr>`+
+      `</table>`+
+      `<div class="note" style="margin-top:6px">Party loot stage = the highest member's; days survived don't affect loot stage (only gamestage). Blood-moon size tracks gamestage — cross-check the Blood Moon Planner.</div>`+
+      `<div class="warnbox">Community-documented approximation. In-game values vary with settings (loot abundance, XP multiplier) and patch tweaks.</div>`;
+  }
+  recalc();
 }
 
 /* ---------- boot sequence ---------- */
