@@ -32,11 +32,22 @@ h1,h2,h3{font-weight:700;letter-spacing:.04em}
 #nav .brand{padding:0 16px 12px;border-bottom:1px solid var(--line);margin-bottom:10px}
 #nav .brand b{color:var(--grn);font-size:16px;text-shadow:0 0 8px var(--grn2)}
 #nav .brand small{color:var(--mut);display:block;font-size:11px;margin-top:3px}
+.burger{display:none;background:var(--panel2);border:1px solid var(--grn2);color:var(--grn);font-family:var(--mono);font-size:14px;padding:8px 14px;border-radius:4px;cursor:pointer;letter-spacing:.05em}
 .navbtn{display:flex;align-items:center;gap:9px;width:100%;text-align:left;background:none;border:0;border-left:3px solid transparent;color:var(--dim);font-family:var(--mono);font-size:13.5px;padding:8px 14px;cursor:pointer;letter-spacing:.03em}
 .navbtn:hover{color:var(--txt);background:var(--panel2)}
 .navbtn.active{color:var(--grn);border-left-color:var(--grn);background:var(--panel2);text-shadow:0 0 6px var(--grn2)}
 .navbtn .ic{width:16px;text-align:center;opacity:.9}
 .navsec{color:var(--mut);font-size:10px;letter-spacing:.2em;padding:12px 16px 4px}
+.navsearch{padding:8px 12px 10px;border-bottom:1px solid var(--line);margin-bottom:6px}
+.navsearch input{width:100%;background:var(--bg);border:1px solid var(--line);color:var(--txt);font-family:var(--mono);font-size:12.5px;padding:7px 9px;border-radius:3px}
+.navsearch input:focus{outline:none;border-color:var(--grn)}
+.srlist{display:flex;flex-direction:column;gap:6px}
+.srhit{display:flex;justify-content:space-between;gap:10px;align-items:center;background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:8px 11px;cursor:pointer}
+.srhit:hover{background:#0f2214;border-color:var(--grn2)}
+.srhit .nm{color:var(--grn);font-size:13.5px}
+.srhit .sub{color:var(--mut);font-size:11px}
+.srhit .pg{color:var(--cyan);font-size:11px;white-space:nowrap}
+.shoplist td .btn{padding:2px 8px}
 #main{flex:1;min-width:0;padding:22px 30px 80px;max-width:1200px}
 .crtwrap{border:1px solid var(--line);background:linear-gradient(180deg,var(--panel2),var(--panel));border-radius:4px;padding:16px 18px;margin-bottom:16px;box-shadow:inset 0 0 40px rgba(20,60,30,.15)}
 .pg-h{color:var(--grn);font-size:22px;margin:0 0 3px;text-shadow:0 0 10px var(--grn2)}
@@ -128,13 +139,18 @@ details.acc .inner{padding:0 12px 12px}
 .linehdr .lname{color:var(--cyan);font-size:15px}
 @media(max-width:760px){
   #app{flex-direction:column}
-  #nav{width:100%;flex:none;height:auto;position:static;display:flex;flex-wrap:wrap;padding:8px}
-  #nav .brand{width:100%}
-  .navsec{display:none}
-  .navbtn{width:auto;border-left:0;border-bottom:2px solid transparent;padding:6px 10px}
-  .navbtn.active{border-left:0;border-bottom-color:var(--grn)}
+  #nav{width:100%;flex:none;height:auto;position:sticky;top:0;z-index:50;padding:10px 8px;background:var(--panel)}
+  #nav .brand{margin-bottom:0;padding-bottom:10px;position:relative;display:flex;flex-direction:column}
+  .burger{display:inline-block;position:absolute;right:8px;top:2px}
+  /* collapsed by default on mobile: hide search + links until opened */
+  #nav .navsearch,#nav .navsec,#nav .navbtn{display:none}
+  #nav.open .navsearch{display:block}
+  #nav.open .navsec{display:block}
+  #nav.open .navbtn{display:flex;width:100%;border-left:3px solid transparent;padding:10px 14px;font-size:15px}
+  #nav.open{max-height:88vh;overflow-y:auto;border-bottom:1px solid var(--line)}
   #main{padding:16px}
 }
+@media(min-width:761px){ #nav{display:block!important} }
 </style>
 </head>
 <body>
@@ -179,6 +195,7 @@ const PAGES=[
   {id:"builder",ic:"✦",label:"Perk Builder"},
   {id:"tracker",ic:"▤",label:"Crew Tracker"},
   {id:"hordebase",ic:"🌙",label:"Blood Moon Planner"},
+  {id:"calc",ic:"🧮",label:"Crafting Calculator"},
   {id:"weapons",ic:"⚔",label:"Weapons",sec:"COMBAT"},
   {id:"progression",ic:"🌲",label:"Tier Progression"},
   {id:"firearms",ic:"🔫",label:"Firearms Detail"},
@@ -203,7 +220,17 @@ const PAGES=[
 let current="dash";
 function buildNav(){
   const n=$("#nav");n.innerHTML="";
-  n.appendChild(el("div","brand","<b>SURVIVOR TERMINAL</b><small>7 DAYS TO DIE · PS5 · V3.0.1<br>Dead Hot Summer</small>"));
+  const brand=el("div","brand","<b>SURVIVOR TERMINAL</b><small>7 DAYS TO DIE · PS5 · V3.0.1<br>Dead Hot Summer</small>");
+  const burger=el("button","burger","☰ MENU");
+  burger.onclick=()=>{n.classList.toggle("open");burger.textContent=n.classList.contains("open")?"✕ CLOSE":"☰ MENU";};
+  brand.appendChild(burger);
+  n.appendChild(brand);
+  const sb=el("div","navsearch");
+  const si=el("input");si.type="search";si.placeholder="🔎 search everything…";si.id="globalsearch";
+  si.value=SEARCHQ;
+  si.oninput=()=>{SEARCHQ=si.value;runSearch(si.value);};
+  si.onkeydown=e=>{if(e.key==="Escape"){si.value="";SEARCHQ="";render();}};
+  sb.appendChild(si);n.appendChild(sb);
   let lastSec=null;
   PAGES.forEach(p=>{
     if(p.sec&&p.sec!==lastSec){n.appendChild(el("div","navsec",p.sec));lastSec=p.sec;}
@@ -213,7 +240,7 @@ function buildNav(){
     n.appendChild(b);
   });
 }
-function go(id){current=id;buildNav();window.scrollTo(0,0);render();}
+function go(id){current=id;SEARCHQ="";buildNav();const n=$("#nav");if(n)n.classList.remove("open");window.scrollTo(0,0);render();}
 
 /* ---------- render dispatch ---------- */
 function render(){
@@ -222,7 +249,7 @@ function render(){
     armor:pgArmor,mods:pgMods,books:pgBooks,crafting:pgCrafting,cookbook:pgCookbook,food:pgFood,
     farming:pgFarming,resources:pgResources,mining:pgMining,zombies:pgZombies,locations:pgLocations,
     firearms:pgFirearms,ammunition:pgAmmo,buffs:pgBuffs,prefabs:pgPrefabs,items:pgItems,building:pgBuilding,
-    progression:pgProgression}[current]||pgDash)(m);
+    progression:pgProgression,calc:pgCalc}[current]||pgDash)(m);
   m.appendChild(el("div","foot",
     "SURVIVOR TERMINAL · data compiled from the official 7 Days to Die wiki for the Update 2.0 perk system (current in V3.0.1). "+
     "Progress saves to this device automatically. Some V3.0 stat tweaks may not yet be documented."));
@@ -429,6 +456,10 @@ function pgTracker(m){
   exp.style.marginLeft="8px";
   exp.onclick=()=>copyBuild();
   ctl.appendChild(exp);
+  const shA=el("button","btn","🔗 Share active build");
+  shA.style.marginLeft="8px";
+  shA.onclick=()=>doShare(member());
+  ctl.appendChild(shA);
   const reset=el("button","btn red","⟲ Reset all");
   reset.style.marginLeft="8px";
   reset.onclick=()=>{if(confirm("Erase all crew data on this device?")){STATE={crew:[blankMember("Survivor 1")],active:0};save();render();}};
@@ -467,6 +498,9 @@ function pgTracker(m){
     const edit=el("button","btn","✎ Edit build");
     edit.onclick=()=>{STATE.active=i;save();go("builder");};
     w.appendChild(edit);
+    const sh=el("button","btn","🔗 Share build link");sh.style.marginLeft="8px";
+    sh.onclick=()=>doShare(c);
+    w.appendChild(sh);
     // supplies checklist
     const sw=el("details","acc");
     sw.innerHTML="<summary>Supplies & gear checklist</summary>";
@@ -1018,6 +1052,191 @@ function suggestWeaponLine(m0){
   return best;
 }
 
+/* ---------- GLOBAL SEARCH ---------- */
+let SEARCHQ="";
+let SEARCHIDX=null;
+const PAGELABEL={};PAGES.forEach(p=>PAGELABEL[p.id]=p.label);
+function pushIdx(idx,name,page,sub){if(name)idx.push({name:String(name),page:page,sub:sub||""});}
+function buildSearchIndex(){
+  if(SEARCHIDX)return SEARCHIDX;
+  const x=[];
+  (DB.perks.attributes||[]).forEach(A=>A.perks.forEach(p=>pushIdx(x,p.name,"builder",A.name+" perk — "+(p.desc||""))));
+  (DB.perks.general||[]).forEach(p=>pushIdx(x,p.name,"builder","General perk"));
+  (DB.weapons.groups||[]).forEach(g=>g.items.forEach(it=>pushIdx(x,it.name,"weapons",g.name)));
+  (DB.firearms.firearms||[]).forEach(f=>pushIdx(x,f.name,"firearms",(f.class||"")+" — "+(f.ammo||"")));
+  (DB.ammunition.ammo||[]).forEach(a=>pushIdx(x,a.name,"ammunition",a.type||"ammo"));
+  (DB.tools.groups||[]).forEach(g=>g.items.forEach(it=>pushIdx(x,it.name,"tools",g.name)));
+  (DB.armor.sets||[]).forEach(s=>pushIdx(x,s.name,"armor",(s.class||"")+" armor set"));
+  (DB.armor.mods||DB.armor.armorMods||[]).forEach(mm=>pushIdx(x,mm.name,"armor","armor mod"));
+  (DB.mods.groups||[]).forEach(g=>g.items.forEach(it=>pushIdx(x,it.name,"mods",g.name)));
+  (DB.books.craftingMagazines||[]).forEach(b=>pushIdx(x,b.series,"books","magazine series"));
+  (DB.books.bookSets||[]).forEach(b=>pushIdx(x,b.name,"books","perk book set"));
+  (DB.crafting.stations||[]).forEach(s=>pushIdx(x,s.name,"crafting","workstation"));
+  (DB.crafting.keyMaterials||[]).forEach(s=>pushIdx(x,s.name,"crafting","material"));
+  (DB.cookbook.recipes||[]).forEach(r=>pushIdx(x,r.name,"cookbook",(r.station||"")+" recipe"));
+  (DB.food.items||[]).forEach(it=>pushIdx(x,it.name,"food",it.type||"consumable"));
+  ["positive","negative","environmental"].forEach(k=>(DB.buffs[k]||[]).forEach(b=>pushIdx(x,b.name,"buffs",k+" effect")));
+  (DB.farming.crops||[]).forEach(c=>pushIdx(x,c.name,"farming","crop"));
+  (DB.resources.groups||[]).forEach(g=>g.items.forEach(it=>pushIdx(x,it.name,"resources",g.name)));
+  (DB.mining.ores||[]).forEach(o=>pushIdx(x,o.name,"mining","ore"));
+  (DB.mining.gatherables||[]).forEach(o=>pushIdx(x,o.name,"mining","gatherable"));
+  (DB.building.materials||[]).forEach(o=>pushIdx(x,o.name,"building","building block"));
+  (DB.items.groups||[]).forEach(g=>g.items.forEach(it=>pushIdx(x,it.name,"items",g.name)));
+  (DB.zombies.zombies||[]).forEach(z=>pushIdx(x,z.name,"zombies",(z.threat||"")+" threat"));
+  (DB.zombies.animals||[]).forEach(z=>pushIdx(x,z.name,"zombies","animal"));
+  ((DB.world&&DB.world.biomes)||[]).forEach(b=>pushIdx(x,b.name,"locations","biome"));
+  ((DB.world&&DB.world.namedLocations)||[]).forEach(b=>pushIdx(x,b.name,"locations",b.type||"landmark"));
+  ((DB.world&&DB.world.traders)||[]).forEach(b=>pushIdx(x,b.name,"locations","trader"));
+  (DB.prefabs.groups||[]).forEach(g=>(g.pois||[]).forEach(p=>pushIdx(x,p.name,"prefabs",g.name)));
+  (DB.progression.weapons||[]).forEach(l=>pushIdx(x,l.line,"progression","weapon line"));
+  (DB.progression.tools||[]).forEach(l=>pushIdx(x,l.line,"progression","tool line"));
+  SEARCHIDX=x;return x;
+}
+function runSearch(q){
+  q=(q||"").trim().toLowerCase();
+  const m=$("#main");
+  if(q.length<2){if(current)render();return;}
+  const idx=buildSearchIndex();
+  const starts=[],incl=[];
+  idx.forEach(e=>{const n=e.name.toLowerCase();if(n.startsWith(q))starts.push(e);else if(n.includes(q)||e.sub.toLowerCase().includes(q))incl.push(e);});
+  const hits=starts.concat(incl).slice(0,60);
+  m.innerHTML="";
+  const w=el("div","crtwrap");
+  w.appendChild(el("div","pg-h","SEARCH"));
+  w.appendChild(el("div","pg-sub",`<span class="prompt">grep -ri "${esc(q)}"</span> — ${hits.length} match${hits.length===1?"":"es"}${hits.length>=60?" (showing first 60)":""}`));
+  const list=el("div","srlist");
+  if(!hits.length)list.appendChild(el("div","note","No matches. Try a shorter term."));
+  hits.forEach(h=>{
+    const row=el("div","srhit");
+    row.innerHTML=`<div><div class="nm">${esc(h.name)}</div><div class="sub">${esc(h.sub)}</div></div><div class="pg">${esc(PAGELABEL[h.page]||h.page)} ▶</div>`;
+    row.onclick=()=>{SEARCHQ="";const gi=$("#globalsearch");if(gi)gi.value="";go(h.page);};
+    list.appendChild(row);
+  });
+  w.appendChild(list);m.appendChild(w);
+}
+
+/* ---------- BUILD SHARING ---------- */
+function encodeBuild(c){
+  const payload={n:c.name,l:c.level,a:c.attributes,p:c.perks,g:c.general,s:c.supplies};
+  try{return btoa(unescape(encodeURIComponent(JSON.stringify(payload))));}catch(e){return"";}
+}
+function shareLink(c){
+  const base=location.origin+location.pathname;
+  return base+"#b="+encodeBuild(c);
+}
+function decodeBuild(code){
+  try{const o=JSON.parse(decodeURIComponent(escape(atob(code))));
+    const nm=blankMember(o.n||"Imported");
+    nm.level=o.l||1;nm.attributes=Object.assign(nm.attributes,o.a||{});
+    nm.perks=o.p||{};nm.general=o.g||{};nm.supplies=o.s||{};
+    normalize(nm);return nm;
+  }catch(e){return null;}
+}
+function checkImport(){
+  const h=location.hash||"";
+  if(h.indexOf("#b=")!==0)return;
+  const code=h.slice(3);
+  const nm=decodeBuild(code);
+  history.replaceState(null,"",location.pathname+location.search);
+  if(!nm)return;
+  if(confirm('Import shared build "'+nm.name+'" (Lv '+nm.level+') as a new survivor?')){
+    STATE.crew.push(nm);STATE.active=STATE.crew.length-1;save();
+  }
+}
+function doShare(c){
+  const link=shareLink(c);
+  if(navigator.clipboard)navigator.clipboard.writeText(link);
+  window.prompt("Share link copied — paste it in your group chat:",link);
+}
+
+/* ---------- CRAFTING CALCULATOR ---------- */
+const CALC_LS="stdtd7_cart_v1";
+function calcRecipes(){
+  const R=[];
+  (DB.cookbook.recipes||[]).forEach(r=>{
+    const mats=(r.ingredients||[]).map(parseMat).filter(Boolean);
+    if(mats.length)R.push({name:r.name,station:r.station||"Campfire",req:r.unlock||"",mats:mats,src:"Cookbook"});
+  });
+  (DB.ammunition.ammo||[]).forEach(a=>{
+    const mats=parseMatList(a.craft);
+    if(mats.length)R.push({name:a.name,station:"Workbench / inventory",req:a.magazine||"",mats:mats,src:"Ammo"});
+  });
+  (DB.building.materials||[]).forEach(b=>{
+    const mats=parseMatList(b.cost);
+    if(mats.length)R.push({name:b.name+" (block)",station:"Inventory",req:"",mats:mats,src:"Building"});
+  });
+  return R.sort((a,b)=>a.name.localeCompare(b.name));
+}
+function parseMat(s){
+  if(!s)return null;s=String(s).trim();
+  let m=s.match(/^(\d+)\s*[x×]?\s+(.+)$/);
+  if(m)return{qty:+m[1],name:m[2].trim()};
+  m=s.match(/^(.+?)\s*[x×]\s*(\d+)$/);
+  if(m)return{qty:+m[2],name:m[1].trim()};
+  return{qty:1,name:s};
+}
+function parseMatList(str){
+  if(!str)return[];
+  return String(str).split(/\s*[+,]\s*/).map(parseMat).filter(x=>x&&x.name&&!/^(none|craftable|loot)/i.test(x.name));
+}
+function cartLoad(){try{return JSON.parse(localStorage.getItem(CALC_LS))||[];}catch(e){return[];}}
+function cartSave(c){try{localStorage.setItem(CALC_LS,JSON.stringify(c));}catch(e){}}
+function pgCalc(m){
+  head(m,"CRAFTING CALCULATOR","calc --shopping-list");
+  const R=calcRecipes();
+  const cart=cartLoad();
+  const ctl=el("div","crtwrap");
+  ctl.innerHTML="<div class='grp-h'>ADD TO SHOPPING LIST</div>"+
+    "<p class='note'>Pick a craftable, set how many, and add it. The list below totals every raw ingredient across your picks. "+
+    "Covers "+R.length+" recipes (food, ammo, building blocks) with verified quantities. Counts are base cost — Master Chef and other perks reduce them.</p>";
+  const f=el("div","field");f.innerHTML="<label>Item</label>";
+  const sel=el("select");sel.style.minWidth="240px";
+  R.forEach((r,i)=>{const o=el("option",null,esc(r.name)+"  ["+r.src+"]");o.value=i;sel.appendChild(o);});
+  f.appendChild(sel);
+  const qty=el("input");qty.type="number";qty.min=1;qty.value=1;qty.style.width="80px";
+  f.appendChild(qty);
+  const add=el("button","btn","+ Add");
+  add.onclick=()=>{const r=R[+sel.value];cart.push({name:r.name,qty:Math.max(1,+qty.value||1),idx:+sel.value});cartSave(cart);go("calc");};
+  f.appendChild(add);
+  ctl.appendChild(f);
+  m.appendChild(ctl);
+
+  // per-item preview
+  const prev=el("div","crtwrap");
+  const r0=R[+sel.value||0];
+  function showPreview(r,n){
+    prev.innerHTML="<div class='grp-h'>RECIPE: "+esc(r.name)+"</div>"+
+      (r.req?`<div style="margin-bottom:6px"><span class="tag warn">${esc(r.req)}</span> <span class="tag">${esc(r.station)}</span></div>`:`<div style="margin-bottom:6px"><span class="tag">${esc(r.station)}</span></div>`)+
+      tbl(["Ingredient","x"+n],r.mats.map(mm=>[esc(mm.name),mm.qty*n]));
+  }
+  showPreview(r0,+qty.value||1);
+  sel.onchange=()=>showPreview(R[+sel.value],+qty.value||1);
+  qty.oninput=()=>showPreview(R[+sel.value],+qty.value||1);
+  m.appendChild(prev);
+
+  // shopping list totals
+  const sl=el("div","crtwrap");
+  sl.innerHTML="<div class='grp-h'>SHOPPING LIST</div>";
+  if(!cart.length){sl.appendChild(el("div","note","Empty — add items above to build a combined materials list."));}
+  else{
+    const totals={};
+    cart.forEach(item=>{const r=R[item.idx];if(!r)return;r.mats.forEach(mm=>{totals[mm.name]=(totals[mm.name]||0)+mm.qty*item.qty;});});
+    // items in cart
+    const itemRows=cart.map((item,i)=>{return `<tr><td>${esc(item.name)}</td><td>x${item.qty}</td><td><button class="btn red" data-rm="${i}">✕</button></td></tr>`;});
+    const it=elHTML(`<table class="shoplist"><tr><th>Crafting</th><th>Qty</th><th></th></tr>${itemRows.join("")}</table>`);
+    sl.appendChild(el("div","note","Queued:"));sl.appendChild(it);
+    it.querySelectorAll("[data-rm]").forEach(b=>b.onclick=()=>{cart.splice(+b.dataset.rm,1);cartSave(cart);go("calc");});
+    // grand totals
+    const rows=Object.keys(totals).sort().map(k=>[`<b>${esc(k)}</b>`,totals[k]]);
+    sl.appendChild(el("div","grp-h","TOTAL RAW MATERIALS NEEDED"));
+    sl.appendChild(elHTML(tbl(["Material","Qty"],rows)));
+    const clr=el("button","btn red","⟲ Clear list");
+    clr.onclick=()=>{cartSave([]);go("calc");};
+    sl.appendChild(clr);
+  }
+  m.appendChild(sl);
+}
+
 /* ---------- boot sequence ---------- */
 const BOOT=[
  "NAVEZGANE BIOS v3.0.1 ............ OK",
@@ -1040,7 +1259,7 @@ function runBoot(){
     txt+=BOOT[line]+"\n";b.innerHTML=txt+'<span class="cur">█</span>';line++;
     setTimeout(tick,line<8?150:400);
   }
-  function enter(){const done=()=>{b.classList.add("hidden");$("#app").classList.remove("hidden");buildNav();render();};
+  function enter(){const done=()=>{b.classList.add("hidden");$("#app").classList.remove("hidden");checkImport();buildNav();render();};
     document.addEventListener("keydown",done,{once:true});
     b.addEventListener("click",done,{once:true});
     setTimeout(done,4000);}
